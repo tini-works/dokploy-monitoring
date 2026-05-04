@@ -10,6 +10,8 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    - Branch: `main`
    - Compose path: `docker-compose.yml`
 
+   <img src="docs/app-compose.png" width="70%" alt="Dokploy compose service configuration" />
+
 2. **Domains** — open the **Domains** tab and add each entry below.
 
    | Host                    | Path                    | Service   | Container Port |
@@ -18,6 +20,8 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    | `alloy.<your-domain>`   | `/v1`                   | `alloy`   | `4318`         |
    | `alloy.<your-domain>`   | `/loki`                 | `alloy`   | `3500`         |
    | `alloy.<your-domain>`   | `/api/v1/metrics/write` | `alloy`   | `9090`         |
+
+   <img src="docs/app-domains.png" width="70%" alt="Dokploy domains configuration" />
 
 3. **Protect Alloy with basic auth** (Traefik middleware)
 
