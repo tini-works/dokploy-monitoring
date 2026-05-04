@@ -10,7 +10,7 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    - Branch: `main`
    - Compose path: `docker-compose.yml`
 
-2. **Domains** — open the **Domains** tab and add each entry below with **Create Domain**. Replace `<your-domain>` with your real domain. All entries: HTTPS on, Certificate = Let's Encrypt.
+2. **Domains** — open the **Domains** tab and add each entry below.
 
    | Host                    | Path                    | Service   | Container Port |
    | ----------------------- | ----------------------- | --------- | -------------- |
@@ -18,8 +18,6 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    | `alloy.<your-domain>`   | `/v1`                   | `alloy`   | `4318`         |
    | `alloy.<your-domain>`   | `/loki`                 | `alloy`   | `3500`         |
    | `alloy.<your-domain>`   | `/api/v1/metrics/write` | `alloy`   | `9090`         |
-
-   The four `alloy.<your-domain>` entries share one host so a single TLS cert covers all routes.
 
 3. **Protect Alloy with basic auth** (Traefik middleware)
 
@@ -37,6 +35,7 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
      middlewares:
        alloy-auth:
          basicAuth:
+           # admin / password
            users:
              - "admin:$apr1$G3T3XOqn$6JGifVcvveyWFg7gYWZjH0"
    ```
@@ -47,43 +46,14 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    alloy-auth@file
    ```
 
-   Now every request to `https://alloy.<your-domain>/*` requires the `admin` credentials. Senders must include them, e.g.:
-
-   ```
-   Authorization: Basic <base64(admin:password)>
-   ```
-
 ## Commands
 
-Smoke-test the stack after deploy. Run any of the senders below — each will prompt for or read the Alloy endpoint and credentials. After each, confirm the signal lands in Grafana.
-
-### Bash (curl)
-
-The scripts prompt interactively for endpoint, user, and password (password is hidden).
-
 ```bash
+# bash (curl)
 ./examples/sh/send-test-log.sh "hello from devops"
 ./examples/sh/send-test-metric.sh 42
 ./examples/sh/send-test-trace.sh
+
+# node
+cd examples/node && pnpm start
 ```
-
-### Node (OpenTelemetry + tsx)
-
-Configure once via `.env`, then run.
-
-```bash
-cd examples/node
-cp .env.example .env       # then edit ALLOY_* values
-pnpm install               # or: npm install
-pnpm start                 # or: npm start
-```
-
-### Verify in Grafana
-
-Open `https://grafana.<your-domain>` and check each datasource:
-
-| Signal | Datasource | Query                                                                |
-| ------ | ---------- | -------------------------------------------------------------------- |
-| Logs   | Loki       | `{service_name="test-service"}` or `{service_name="node-otel-test"}` |
-| Metric | Mimir      | `test_temperature`                                                   |
-| Trace  | Tempo      | `{ .service.name = "test-service" }` or `"node-otel-test"`           |
