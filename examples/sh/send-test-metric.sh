@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Send a sample OTLP metric to Alloy (forwarded to Mimir) for testing
 
-ALLOY_ENDPOINT="${ALLOY_ENDPOINT:-https://alloy.example.com}"
-ALLOY_USER="${ALLOY_USER:-admin}"
-ALLOY_PASSWORD="${ALLOY_PASSWORD:-password}"
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_prompt.sh
+source "${SCRIPT_DIR}/_prompt.sh"
 
 NOW_NS=$(python3 -c "import time; print(int(time.time() * 1e9))")
 VALUE="${1:-42.0}"

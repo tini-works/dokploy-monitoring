@@ -1,5 +1,7 @@
 // Send one OTLP trace, metric, and log to Alloy via HTTPS + basic auth.
-// Run with: pnpm install && pnpm start  (or: npm i && npm start)
+// Run with: cp .env.example .env && pnpm install && pnpm start
+
+import "dotenv/config";
 
 import { metrics, trace } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
@@ -18,25 +20,36 @@ import {
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 
-const ALLOY_ENDPOINT =
-  process.env.ALLOY_ENDPOINT ?? "https://alloy.example.com";
-const ALLOY_USER = process.env.ALLOY_USER ?? "admin";
-const ALLOY_PASSWORD = process.env.ALLOY_PASSWORD ?? "password";
-const SERVICE_NAME = process.env.SERVICE_NAME ?? "node-otel-test";
+const serviceName = "node-otel-test";
 
-const authToken = Buffer.from(`${ALLOY_USER}:${ALLOY_PASSWORD}`).toString(
+const {
+  ALLOY_ENDPOINT: alloyEndpoint,
+  ALLOY_USER: alloyUser,
+  ALLOY_PASSWORD: alloyPassword,
+  METRIC_VALUE: metricValue = (Math.random() * 100).toFixed(2),
+  LOG_MESSAGE: logMessage = `random log ${Math.random().toString(36).slice(2, 10)} @ ${new Date().toISOString()}`,
+} = process.env;
+
+if (!alloyEndpoint || !alloyUser || !alloyPassword) {
+  console.error(
+    "Missing ALLOY_ENDPOINT / ALLOY_USER / ALLOY_PASSWORD — copy .env.example to .env and fill in.",
+  );
+  process.exit(1);
+}
+
+const authToken = Buffer.from(`${alloyUser}:${alloyPassword}`).toString(
   "base64",
 );
 const headers = { Authorization: `Basic ${authToken}` };
 
-const resource = new Resource({ "service.name": SERVICE_NAME });
+const resource = new Resource({ "service.name": serviceName });
 
 const tracerProvider = new NodeTracerProvider({
   resource,
   spanProcessors: [
     new SimpleSpanProcessor(
       new OTLPTraceExporter({
-        url: `${ALLOY_ENDPOINT}/v1/traces`,
+        url: `${alloyEndpoint}/v1/traces`,
         headers,
       }),
     ),
@@ -49,7 +62,7 @@ const meterProvider = new MeterProvider({
   readers: [
     new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({
-        url: `${ALLOY_ENDPOINT}/v1/metrics`,
+        url: `${alloyEndpoint}/v1/metrics`,
         headers,
       }),
       exportIntervalMillis: 1_000,
@@ -63,7 +76,7 @@ const loggerProvider = new LoggerProvider({
   processors: [
     new SimpleLogRecordProcessor(
       new OTLPLogExporter({
-        url: `${ALLOY_ENDPOINT}/v1/logs`,
+        url: `${alloyEndpoint}/v1/logs`,
         headers,
       }),
     ),
@@ -72,9 +85,9 @@ const loggerProvider = new LoggerProvider({
 logs.setGlobalLoggerProvider(loggerProvider);
 
 async function main() {
-  const tracer = trace.getTracer(SERVICE_NAME);
-  const meter = metrics.getMeter(SERVICE_NAME);
-  const logger = logs.getLogger(SERVICE_NAME);
+  const tracer = trace.getTracer(serviceName);
+  const meter = metrics.getMeter(serviceName);
+  const logger = logs.getLogger(serviceName);
 
   const span = tracer.startSpan("correct-timestamp-test", {
     attributes: {
@@ -86,15 +99,15 @@ async function main() {
   span.end();
 
   const gauge = meter.createGauge("test_temperature");
-  gauge.record(Number(process.env.METRIC_VALUE ?? 42), {
-    source: SERVICE_NAME,
+  gauge.record(Number(metricValue), {
+    source: serviceName,
   });
 
   logger.emit({
     severityText: "INFO",
-    body: process.env.LOG_MESSAGE ?? `hello from ${SERVICE_NAME}`,
+    body: logMessage,
     attributes: {
-      "service.name": SERVICE_NAME,
+      "service.name": serviceName,
       level: "info",
       source: "main.ts",
     },
@@ -108,10 +121,10 @@ async function main() {
   await meterProvider.shutdown();
   await loggerProvider.shutdown();
 
-  console.log(`Sent trace, metric, log to ${ALLOY_ENDPOINT}`);
-  console.log(`  Tempo:  { .service.name = "${SERVICE_NAME}" }`);
-  console.log(`  Mimir:  test_temperature{source="${SERVICE_NAME}"}`);
-  console.log(`  Loki:   {service_name="${SERVICE_NAME}"}`);
+  console.log(`Sent trace, metric, log to ${alloyEndpoint}`);
+  console.log(`  Tempo:  { .service.name = "${serviceName}" }`);
+  console.log(`  Mimir:  test_temperature{source="${serviceName}"}`);
+  console.log(`  Loki:   {service_name="${serviceName}"}`);
 }
 
 main().catch((err) => {

@@ -52,3 +52,38 @@ Grafana + Loki + Tempo + Mimir + Alloy as a single Dokploy Compose service.
    ```
    Authorization: Basic <base64(admin:password)>
    ```
+
+## Commands
+
+Smoke-test the stack after deploy. Run any of the senders below — each will prompt for or read the Alloy endpoint and credentials. After each, confirm the signal lands in Grafana.
+
+### Bash (curl)
+
+The scripts prompt interactively for endpoint, user, and password (password is hidden).
+
+```bash
+./examples/sh/send-test-log.sh "hello from devops"
+./examples/sh/send-test-metric.sh 42
+./examples/sh/send-test-trace.sh
+```
+
+### Node (OpenTelemetry + tsx)
+
+Configure once via `.env`, then run.
+
+```bash
+cd examples/node
+cp .env.example .env       # then edit ALLOY_* values
+pnpm install               # or: npm install
+pnpm start                 # or: npm start
+```
+
+### Verify in Grafana
+
+Open `https://grafana.<your-domain>` and check each datasource:
+
+| Signal | Datasource | Query                                                                |
+| ------ | ---------- | -------------------------------------------------------------------- |
+| Logs   | Loki       | `{service_name="test-service"}` or `{service_name="node-otel-test"}` |
+| Metric | Mimir      | `test_temperature`                                                   |
+| Trace  | Tempo      | `{ .service.name = "test-service" }` or `"node-otel-test"`           |
